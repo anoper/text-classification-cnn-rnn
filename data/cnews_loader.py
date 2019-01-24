@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import sys
+import os
 from collections import Counter
 import numpy as np
 import tensorflow.contrib.keras as kr
@@ -97,7 +98,6 @@ def to_words(content, words):
 def process_file(filename, word_to_id, cat_to_id, max_length=600):
     """将文件转换为id表示"""
     contents, labels = read_file(filename)
-
     data_id, label_id = [], []
     for i in range(len(contents)):
         data_id.append([word_to_id[x] for x in contents[i] if x in word_to_id])
@@ -110,6 +110,25 @@ def process_file(filename, word_to_id, cat_to_id, max_length=600):
     return x_pad, y_pad
 
 
+def process_file_1(dir_path):
+    """将文件转换为id表示"""
+    fps_list = []
+    labels_list = []
+    clazzes = os.listdir(dir_path)
+    for clazz in clazzes:
+        clazz_dir_path = os.path.join(dir_path, clazz)
+        fns = os.listdir(clazz_dir_path)
+        for fn in fns:
+            fp = os.path.abspath(os.path.join(dir_path, clazz, fn))
+            fps_list.append(fp)
+            labels_list.append(clazz)
+    fps = np.array(fps_list)
+    fps.astype(np.str)
+    labels = np.array(labels_list)
+    labels.astype(np.str)
+    return fps, labels
+
+
 def batch_iter(x, y, batch_size=64):
     """生成批次数据"""
     # 当前数据的数量
@@ -118,6 +137,49 @@ def batch_iter(x, y, batch_size=64):
     num_batch = int((data_len - 1) / batch_size) + 1
     # 得到一个长度为data_len的numpy数组, 其内容为0~144的数字的随机排列
     indices = np.random.permutation(np.arange(data_len))
+
+    # todo 转换出错, 需要把list转换为numpy
+    # 得到一个混洗之后的数据
+    x_shuffle = x[indices]
+    # 混洗之后的标签
+    y_shuffle = y[indices]
+    for i in range(num_batch):
+        start_id = i * batch_size
+        end_id = min((i + 1) * batch_size, data_len)
+        yield x_shuffle[start_id:end_id], y_shuffle[start_id:end_id]
+
+
+def encode_from_fp(fps, labels, word_to_id, cat_to_id, max_length):
+    contents = []
+
+    for i in range(len(fps)):
+        fp = fps[i]
+        with open(fp, 'r', encoding='utf-8') as f:
+            content = ''.join(f.readlines())
+        content = content.replace('\r\n', '')
+        content = content.replace('\t', '')
+        content = content.replace('  ', ' ')
+        contents.append(content)
+
+    data_id, label_id = [], []
+    for i in range(len(contents)):
+        data_id.append([word_to_id[x] for x in contents[i] if x in word_to_id])
+        label_id.append(cat_to_id[labels[i]])
+
+    # 使用keras提供的pad_sequences来将文本pad为固定长度
+    x_pad = kr.preprocessing.sequence.pad_sequences(data_id, max_length)
+    y_pad = kr.utils.to_categorical(label_id, num_classes=len(cat_to_id))  # 将标签转换为one-hot表示
+    return x_pad, y_pad
+
+
+def batch_iter_1(x, y, word_to_id, cat_to_id, max_length, batch_size=64):
+    """生成批次数据"""
+    # 当前数据的数量
+    fps_len = len(x)
+    # 一共有多少个批次
+    num_batch = int((fps_len - 1) / batch_size) + 1
+    # 得到一个长度为data_len的numpy数组, 其内容为0~144的数字的随机排列
+    indices = np.random.permutation(np.arange(fps_len))
     # 得到一个混洗之后的数据
     x_shuffle = x[indices]
     # 混洗之后的标签
@@ -125,5 +187,7 @@ def batch_iter(x, y, batch_size=64):
 
     for i in range(num_batch):
         start_id = i * batch_size
-        end_id = min((i + 1) * batch_size, data_len)
-        yield x_shuffle[start_id:end_id], y_shuffle[start_id:end_id]
+        end_id = min((i + 1) * batch_size, fps_len)
+        content_fps, labels = x_shuffle[start_id:end_id], y_shuffle[start_id:end_id]
+        x_ids, y_ids = encode_from_fp(content_fps, labels, word_to_id, cat_to_id, max_length)
+        yield x_ids, y_ids

@@ -13,12 +13,17 @@ import tensorflow as tf
 from sklearn import metrics
 
 from cnn_model import TCNNConfig, TextCNN
-from data.cnews_loader import read_vocab, read_category, batch_iter, process_file, build_vocab
+from data.cnews_loader import read_vocab, read_category, batch_iter, process_file, build_vocab, process_file_1, batch_iter_1, encode_from_fp
 
-base_dir = 'data/cnews'
-train_dir = os.path.join(base_dir, 'cnews.train.txt')
-test_dir = os.path.join(base_dir, 'cnews.test.txt')
-val_dir = os.path.join(base_dir, 'cnews.val.txt')
+# base_dir = 'data/cnews'
+# train_dir = os.path.join(base_dir, 'cnews.train.txt')
+# test_dir = os.path.join(base_dir, 'cnews.test.txt')
+# val_dir = os.path.join(base_dir, 'cnews.val.txt')
+base_dir = 'data/cnews_dir'
+train_dir = os.path.join(base_dir, 'train')
+test_dir = os.path.join(base_dir, 'test')
+val_dir = os.path.join(base_dir, 'val')
+
 vocab_dir = os.path.join(base_dir, 'cnews.vocab.txt')
 
 save_dir = 'checkpoints/textcnn'
@@ -77,8 +82,12 @@ def train():
     print("Loading training and validation data...")
     # 载入训练集与验证集
     start_time = time.time()
-    x_train, y_train = process_file(train_dir, word_to_id, cat_to_id, config.seq_length)
-    x_val, y_val = process_file(val_dir, word_to_id, cat_to_id, config.seq_length)
+    # x_train_fps, y_train_labels = process_file(train_dir, word_to_id, cat_to_id, config.seq_length)
+    # x_val_fps, y_val_labels = process_file(val_dir, word_to_id, cat_to_id, config.seq_length)
+
+    x_train_fps, y_train_labels = process_file_1(train_dir)
+    x_val_fps, y_val_labels = process_file_1(val_dir)
+
     time_dif = get_time_dif(start_time)
     print("Time usage:", time_dif)
 
@@ -98,7 +107,9 @@ def train():
     for epoch in range(config.num_epochs):
         print('Epoch:', epoch + 1)
         # todo
-        batch_train = batch_iter(x_train, y_train, config.batch_size)
+        # batch_train = batch_iter(x_train_fps, y_train_labels, config.batch_size)
+        batch_train = batch_iter_1(x_train_fps, y_train_labels, word_to_id, cat_to_id, 600, config.batch_size)
+
         for x_batch, y_batch in batch_train:
             feed_dict = feed_data(x_batch, y_batch, config.dropout_keep_prob)
 
@@ -111,6 +122,7 @@ def train():
                 # 每多少轮次输出在训练集和验证集上的性能
                 feed_dict[model.keep_prob] = 1.0
                 loss_train, acc_train = session.run([model.loss, model.acc], feed_dict=feed_dict)
+                x_val, y_val = encode_from_fp(x_val_fps, y_val_labels, word_to_id, cat_to_id, 600)
                 loss_val, acc_val = evaluate(session, x_val, y_val)  # todo
 
                 if acc_val > best_acc_val:

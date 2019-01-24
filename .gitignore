@@ -2,6 +2,7 @@
 data/cnews
 data/cnews_bak
 data/test/
+data/cnews_dir
 data/thucnews
 __pycache__
 cnn_keras.py
