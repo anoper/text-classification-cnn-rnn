@@ -32,7 +32,6 @@ class TextCNN(object):
         self.config = config
 
         # 三个待输入的数据
-
         # 输入的薰里阿尼数据
         self.input_x = tf.placeholder(tf.int32, [None, self.config.seq_length], name='input_x')
         # 训练的标签
@@ -76,4 +75,3 @@ class TextCNN(object):
             # 准确率
             correct_pred = tf.equal(tf.argmax(self.input_y, 1), self.y_pred_cls)
             self.acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-
